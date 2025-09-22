@@ -2,8 +2,8 @@ package configuration
 
 import (
 	"fmt"
-	"log"
 	"goserve/configuration/utils"
+	"log"
 )
 
 type ConfigurationSource struct {
@@ -48,10 +48,8 @@ func (cl *ConfigLoader) Load(options ...ConfigOption) (Configuration, error) {
 		}
 	}
 
-	if options != nil {
-		for _, option := range options {
-			option(cl.config)
-		}
+	for _, option := range options {
+		option(cl.config)
 	}
 
 	cl.config.Server.validate()

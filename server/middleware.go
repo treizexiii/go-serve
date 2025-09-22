@@ -15,11 +15,11 @@ type Middleware struct {
 }
 
 func (m *Middleware) HasPath() bool {
-	return m.Path != nil && len(m.Path) > 0
+	return len(m.Path) > 0
 }
 
 func (m *Middleware) HasMethod() bool {
-	return m.Method != nil && len(m.Method) > 0
+	return len(m.Method) > 0
 }
 
 func (m *Middleware) Apply(path string, method string) bool {

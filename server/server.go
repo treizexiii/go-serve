@@ -35,7 +35,7 @@ func (s *Server) Start() error {
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
-		log.Printf("Listen on port %v", s.server.Addr)
+		log.Printf("Start listening on %v:%d", s.config.GetAddress(), s.config.GetPort())
 		if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Could not listen on port %v: %v", s.server.Addr, err)
 		}

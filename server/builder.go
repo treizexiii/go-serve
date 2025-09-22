@@ -163,6 +163,7 @@ func (s *builder) Build() HttpServer {
 	return &Server{
 		server: httpServer,
 		mux:    mux,
+		config: s.config,
 	}
 }
 
