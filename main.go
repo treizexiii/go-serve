@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"goserve/configuration"
 	"goserve/server"
+	"log"
 	"net/http"
 )
 
@@ -12,26 +13,28 @@ func main() {
 
 	configBuilder := configuration.New()
 	configuration, err := configBuilder.LoadConfig()
+	if err != nil {
+		log.Fatalf("Error loading configuration: %v", err)
+	}
 
-	builder := server.New().WithConfiguration(configuration)
-
-	builder.
-		GET("/hello", func(w http.ResponseWriter, r *http.Request) {
+	hello := server.
+		CreateRoute(server.GET, "/hello", func(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte("Hello, World!"))
-		}).
-		POST("/echo", func(w http.ResponseWriter, r *http.Request) {
-			body := make([]byte, r.ContentLength)
-			r.Body.Read(body)
+		})
 
-			result := fmt.Sprintf("Echo: %s", string(body))
+	builder := server.New().
+		WithConfiguration(configuration).
+		WithLogging(true, true).
+		AddRoutes([]server.RouteInfo{
+			hello,
+			server.CreatePOST("/echo", func(w http.ResponseWriter, r *http.Request) {
+				body := make([]byte, r.ContentLength)
+				r.Body.Read(body)
 
-			w.Write([]byte(result))
-		}).
-		AddGlobalMiddleware("RequestLogging", func(next http.Handler) http.Handler {
-			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				fmt.Printf("Request: %s %s\n", r.Method, r.URL.Path)
-				next.ServeHTTP(w, r)
-			})
+				result := fmt.Sprintf("Echo: %s", string(body))
+
+				w.Write([]byte(result))
+			}),
 		})
 
 	server := builder.Build()

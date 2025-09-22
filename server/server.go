@@ -18,6 +18,11 @@ type Server struct {
 	config configuration.Configuration
 }
 
+type loggingResponseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
 func (s *Server) GetHttpServer() *http.Server {
 	return s.server
 }

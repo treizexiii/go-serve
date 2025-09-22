@@ -1,5 +1,5 @@
 ### hello
-GET http://localhost:8080/hello HTTP/1.1
+GET http://localhost:8082/hello HTTP/1.1
 
 ### echo
 POST http://localhost:8080/echo HTTP/1.1

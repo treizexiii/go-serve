@@ -12,8 +12,8 @@ type builder struct {
 	mux          *http.ServeMux
 	port         int
 	address      string
-	routes       []Route
-	middlewares  []Middleware
+	routes       []RouteInfo
+	middlewares  []MiddlewareInfo
 	config       configuration.Configuration
 	readTimeout  int
 	writeTimeout int
@@ -25,10 +25,10 @@ type builder struct {
 func New() ServerBuilder {
 	return &builder{
 		mux:          http.NewServeMux(),
-		routes:       make([]Route, 0),
+		routes:       make([]RouteInfo, 0),
 		address:      "",
 		port:         8080, // Default port
-		middlewares:  make([]Middleware, 0),
+		middlewares:  make([]MiddlewareInfo, 0),
 		config:       nil,
 		readTimeout:  15,
 		writeTimeout: 15,
@@ -47,16 +47,12 @@ func (s *builder) SetPort(port int) ServerBuilder {
 }
 
 func (s *builder) AddRoute(method Http_Method, path string, handler HandlerFunc) ServerBuilder {
-	s.routes = append(s.routes, Route{
-		Method:  method,
-		Path:    path,
-		Handler: handler,
-	})
+	s.routes = append(s.routes, CreateRoute(method, path, handler))
 
 	return s
 }
 
-func (s *builder) AddRoutes(routes []Route) ServerBuilder {
+func (s *builder) AddRoutes(routes []RouteInfo) ServerBuilder {
 	s.routes = append(s.routes, routes...)
 	return s
 }
@@ -77,63 +73,65 @@ func (s *builder) DELETE(path string, handler HandlerFunc) ServerBuilder {
 	return s.addRoute(CreateDELETE(path, handler))
 }
 
-func (s *builder) addRoute(route Route) ServerBuilder {
+func (s *builder) addRoute(route RouteInfo) ServerBuilder {
 	s.routes = append(s.routes, route)
 	return s
 }
 
 func (s *builder) AddGlobalMiddleware(name string, middleware MiddlewareFunc) ServerBuilder {
-	s.middlewares = append(s.middlewares, Middleware{
+	s.middlewares = append(s.middlewares, MiddlewareInfo{
 		Name:       name,
 		Middleware: middleware,
-		Path:       nil,
-		Method:     nil,
 	})
 	return s
 }
 
-func (s *builder) AddRouteMiddleware(name string, middleware MiddlewareFunc, Path []string) ServerBuilder {
-	s.middlewares = append(s.middlewares, Middleware{
-		Name:       name,
-		Middleware: middleware,
-		Path:       Path,
-		Method:     nil,
-	})
+func (s *builder) WithLogging(logRequests, logResponses bool) ServerBuilder {
+	if logRequests || logResponses {
+		s.AddGlobalMiddleware("Logging", func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if logRequests {
+					log.Printf("Request: %s %s", r.Method, r.URL.Path)
+				}
+
+				if logResponses {
+					lrw := &loggingResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
+					next.ServeHTTP(lrw, r)
+					log.Printf("Response: %s %s - %d", r.Method, r.URL.Path, lrw.statusCode)
+				} else {
+					next.ServeHTTP(w, r)
+				}
+			})
+		})
+	}
 	return s
 }
 
-func (s *builder) AddMethodMiddleware(name string, middleware MiddlewareFunc, Method []string) ServerBuilder {
-	s.middlewares = append(s.middlewares, Middleware{
-		Name:       name,
-		Middleware: middleware,
-		Path:       nil,
-		Method:     Method,
-	})
-	return s
-}
-
-func (s *builder) registerRoute(route Route) {
+func (s *builder) registerRoute(route RouteInfo) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != string(route.Method) {
+		if r.Method != string(route.GetMethod()) {
 			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		route.Handler(w, r)
+		route.GetHandler().handler(w, r)
 	})
 
-	finalHandler := s.applyMiddlewares(handler, route.Path, string(route.Method))
+	finalHandler := s.applyMiddlewares(handler, route)
 
-	s.mux.Handle(route.Path, finalHandler)
+	s.mux.Handle(route.GetPath(), finalHandler)
 }
 
-func (s *builder) applyMiddlewares(handler http.Handler, path, method string) http.Handler {
+func (s *builder) applyMiddlewares(handler http.Handler, route RouteInfo) http.Handler {
 	result := handler
 
 	for i := len(s.middlewares) - 1; i >= 0; i-- {
 		middleware := s.middlewares[i]
-		if middleware.Apply(path, method) {
-			result = middleware.Middleware(result)
-		}
+		result = middleware.Middleware(result)
+	}
+
+	for i := len(route.GetHandler().middlewares) - 1; i >= 0; i-- {
+		middleware := route.GetHandler().middlewares[i]
+		result = middleware(result)
 	}
 
 	return result
@@ -190,15 +188,12 @@ func (s *builder) logServerConfig() {
 		log.Printf("Registered Middlewares:")
 		for _, mw := range s.middlewares {
 			scope := "global"
-			if len(mw.Path) > 0 || len(mw.Method) > 0 {
-				scope = fmt.Sprintf("paths: %v, methods: %v", mw.Path, mw.Method)
-			}
 			log.Printf("  - %s (%s)", mw.Name, scope)
 		}
 	}
 
 	log.Printf("Registered Routes:")
 	for _, route := range s.routes {
-		log.Printf("  %s %s", route.Method, route.Path)
+		log.Printf("  %s %s", route.GetMethod(), route.GetPath())
 	}
 }
