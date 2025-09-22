@@ -90,20 +90,3 @@ func (r *Route) WithMiddleware(middlewares ...MiddlewareFunc) RouteInfo {
 	r.handler.middlewares = append(r.handler.middlewares, middlewares...)
 	return r
 }
-
-// func (r *Route) WithLogging(logRequests, logResponses bool) RouteInfo {
-// 	return r.WithMiddleware(func(next http.Handler) http.Handler {
-// 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-// 			if logRequests {
-// 				log.Printf("Request: %s %s", r.Method, r.URL.Path)
-// 			}
-
-// 			wrapper := &loggingResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
-// 			next.ServeHTTP(wrapper, r)
-
-// 			if logResponses {
-// 				log.Printf("Response: %s %s - %d", r.Method, r.URL.Path, wrapper.statusCode)
-// 			}
-// 		})
-// 	})
-// }
