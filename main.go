@@ -17,20 +17,14 @@ func main() {
 		log.Fatalf("Error loading configuration: %v", err)
 	}
 
-	builder := server.New().WithConfiguration(configuration).WithLogging(true, true)
+	hello := server.
+		CreateRoute(server.GET, "/hello", func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte("Hello, World!"))
+		})
 
-	hello := server.CreateRoute(server.GET, "/hello", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Hello, World!"))
-	})
-
-	// WithMiddleware(func(next http.Handler) http.Handler {
-	// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	// 		fmt.Printf("Request: %s %s\n", r.Method, r.URL.Path)
-	// 		next.ServeHTTP(w, r)
-	// 	})
-	// })
-
-	builder.
+	builder := server.New().
+		WithConfiguration(configuration).
+		WithLogging(true, true).
 		AddRoutes([]server.RouteInfo{
 			hello,
 			server.CreatePOST("/echo", func(w http.ResponseWriter, r *http.Request) {
@@ -41,11 +35,6 @@ func main() {
 
 				w.Write([]byte(result))
 			}),
-			// AddGlobalMiddleware("RequestLogging", func(next http.Handler) http.Handler {
-			// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// 		fmt.Printf("Request: %s %s\n", r.Method, r.URL.Path)
-			// 		next.ServeHTTP(w, r)
-			// 	})
 		})
 
 	server := builder.Build()
