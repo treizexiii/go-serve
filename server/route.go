@@ -1,6 +1,8 @@
 package server
 
-import "net/http"
+import (
+	"net/http"
+)
 
 type Http_Method string
 
@@ -11,42 +13,97 @@ const (
 	DELETE Http_Method = "DELETE"
 )
 
-type HandlerFunc func(w http.ResponseWriter, r *http.Request)
-
 type Route struct {
-	Method  Http_Method
-	Path    string
-	Handler HandlerFunc
+	method      Http_Method
+	path        string
+	handler     RouteHandler
+	queryParams []string
+	tags        []string
 }
 
-func CreateGET(path string, handler HandlerFunc) Route {
-	return Route{
-		Method:  GET,
-		Path:    path,
-		Handler: handler,
+type RouteHandler struct {
+	handler     HandlerFunc
+	middlewares []MiddlewareFunc
+	meta        map[string]interface{}
+}
+
+type HandlerFunc func(w http.ResponseWriter, r *http.Request)
+type MiddlewareFunc func(http.Handler) http.Handler
+
+func CreateRoute(method Http_Method, path string, handler HandlerFunc) RouteInfo {
+	return &Route{
+		method: method,
+		path:   path,
+		tags:   []string{},
+		handler: RouteHandler{
+			handler:     handler,
+			middlewares: []MiddlewareFunc{},
+			meta:        make(map[string]interface{}),
+		},
 	}
 }
 
-func CreatePOST(path string, handler HandlerFunc) Route {
-	return Route{
-		Method:  POST,
-		Path:    path,
-		Handler: handler,
-	}
+func CreateGET(path string, handler HandlerFunc) RouteInfo {
+	return CreateRoute(GET, path, handler)
 }
 
-func CreatePUT(path string, handler HandlerFunc) Route {
-	return Route{
-		Method:  PUT,
-		Path:    path,
-		Handler: handler,
-	}
+func CreatePOST(path string, handler HandlerFunc) RouteInfo {
+	return CreateRoute(POST, path, handler)
 }
 
-func CreateDELETE(path string, handler HandlerFunc) Route {
-	return Route{
-		Method:  DELETE,
-		Path:    path,
-		Handler: handler,
-	}
+func CreatePUT(path string, handler HandlerFunc) RouteInfo {
+	return CreateRoute(PUT, path, handler)
 }
+
+func CreateDELETE(path string, handler HandlerFunc) RouteInfo {
+	return CreateRoute(DELETE, path, handler)
+}
+
+func (r *Route) GetMethod() Http_Method {
+	return r.method
+}
+
+func (r *Route) GetPath() string {
+	return r.path
+}
+
+func (r *Route) GetHandler() *RouteHandler {
+	return &r.handler
+}
+
+// WithMeta implements RouteInfo.
+func (r *Route) WithMeta(key string, value interface{}) RouteInfo {
+	if r.handler.meta == nil {
+		r.handler.meta = make(map[string]interface{})
+	}
+	r.handler.meta[key] = value
+	return r
+}
+
+// WithTags implements RouteInfo.
+func (r *Route) WithTags(tags ...string) RouteInfo {
+	r.tags = append(r.tags, tags...)
+	return r
+}
+
+func (r *Route) WithMiddleware(middlewares ...MiddlewareFunc) RouteInfo {
+	r.handler.middlewares = append(r.handler.middlewares, middlewares...)
+	return r
+}
+
+// func (r *Route) WithLogging(logRequests, logResponses bool) RouteInfo {
+// 	return r.WithMiddleware(func(next http.Handler) http.Handler {
+// 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// 			if logRequests {
+// 				log.Printf("Request: %s %s", r.Method, r.URL.Path)
+// 			}
+
+// 			wrapper := &loggingResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
+// 			next.ServeHTTP(wrapper, r)
+
+// 			if logResponses {
+// 				log.Printf("Response: %s %s - %d", r.Method, r.URL.Path, wrapper.statusCode)
+// 			}
+// 		})
+// 	})
+// }
