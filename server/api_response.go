@@ -1,4 +1,4 @@
-package jsonreponse
+package server
 
 import (
 	"encoding/json"
@@ -10,9 +10,9 @@ type ApiResponse interface {
 }
 
 type ErrorResponse struct {
-	Success      bool   `json:"success"`
-	ErrorMessage string `json:"error_message"`
-	Timestamp    int64  `json:"timestamp"`
+	Success   bool   `json:"success"`
+	Message   string `json:"message"`
+	Timestamp int64  `json:"timestamp"`
 }
 
 type SuccessResponse struct {
@@ -41,8 +41,8 @@ func Ok(data interface{}) ApiResponse {
 
 func Ko(message string) ApiResponse {
 	return &ErrorResponse{
-		Success:      false,
-		ErrorMessage: message,
-		Timestamp:    time.Now().Unix(),
+		Success:   false,
+		Message:   message,
+		Timestamp: time.Now().Unix(),
 	}
 }

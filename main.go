@@ -18,12 +18,15 @@ func main() {
 	}
 
 	hello := server.
-		CreateRoute(server.GET, "/hello", func(w http.ResponseWriter, r *http.Request) {
+		CreateRoute(server.GET, "/hello", func(w http.ResponseWriter, r *http.Request)x {
 			w.Write([]byte("Hello, World!"))
 		})
 
+	demo := server.CreateRoute(server.GET, "/demo", contextDemoHandler())
+
 	builder := server.New().
 		WithConfiguration(configuration).
+		WithJSONSerialization().
 		WithLogging(true, true).
 		AddRoutes([]server.RouteInfo{
 			hello,
@@ -43,4 +46,18 @@ func main() {
 	if err != nil {
 		fmt.Printf("Error starting server: %v\n", err)
 	}
+}
+
+func contextDemoHandler(w http.ResponseWriter, r *http.Request) any {
+	// Créer des données via le contexte (approche alternative)
+	responseData := map[string]interface{}{
+		"message":     "Données passées via le contexte",
+		"method":      r.Method,
+		"path":        r.URL.Path,
+		"user_agent":  r.UserAgent(),
+		"remote_addr": r.RemoteAddr,
+	}
+
+	// Utiliser le helper pour structurer la réponse
+	return responseData
 }

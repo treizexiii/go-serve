@@ -23,6 +23,7 @@ type ServerBuilder interface {
 	SetPort(port int) ServerBuilder
 
 	AddGlobalMiddleware(name string, middleware MiddlewareFunc) ServerBuilder
+	WithJSONSerialization() ServerBuilder
 	WithLogging(logRequests, logResponses bool) ServerBuilder
 
 	// Add a single route to the server

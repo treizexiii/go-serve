@@ -28,6 +28,8 @@ type RouteHandler struct {
 }
 
 type HandlerFunc func(w http.ResponseWriter, r *http.Request)
+
+// type HandlerFunc func(w http.ResponseWriter, r *http.Request) (interface{}, error)
 type MiddlewareFunc func(http.Handler) http.Handler
 
 func CreateRoute(method Http_Method, path string, handler HandlerFunc) RouteInfo {
