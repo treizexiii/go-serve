@@ -27,14 +27,14 @@ func main() {
 		WithLogging(true, true).
 		AddRoutes([]server.RouteInfo{
 			hello,
-			server.CreatePOST("/echo", func(w http.ResponseWriter, r *http.Request) {
-				body := make([]byte, r.ContentLength)
-				r.Body.Read(body)
+		}).
+		POST("/echo", func(w http.ResponseWriter, r *http.Request) {
+			body := make([]byte, r.ContentLength)
+			r.Body.Read(body)
 
-				result := fmt.Sprintf("Echo: %s", string(body))
+			result := fmt.Sprintf("Echo: %s", string(body))
 
-				w.Write([]byte(result))
-			}),
+			w.Write([]byte(result))
 		})
 
 	server := builder.Build()

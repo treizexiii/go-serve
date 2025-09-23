@@ -6,6 +6,8 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type builder struct {
@@ -86,18 +88,23 @@ func (s *builder) AddGlobalMiddleware(name string, middleware MiddlewareFunc) Se
 	return s
 }
 
+func (s *builder) WithJSONSerialization() ServerBuilder {
+	return s.AddGlobalMiddleware("JSONSerialization", JSONSerializationMiddleware())
+}
+
 func (s *builder) WithLogging(logRequests, logResponses bool) ServerBuilder {
 	if logRequests || logResponses {
+		requestId := uuid.New().String()
 		s.AddGlobalMiddleware("Logging", func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if logRequests {
-					log.Printf("Request: %s %s", r.Method, r.URL.Path)
+					log.Printf("Request: %s %s %s", requestId, r.Method, r.URL.Path)
 				}
 
 				if logResponses {
 					lrw := &loggingResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
 					next.ServeHTTP(lrw, r)
-					log.Printf("Response: %s %s - %d", r.Method, r.URL.Path, lrw.statusCode)
+					log.Printf("Response: %s %d", requestId, lrw.statusCode)
 				} else {
 					next.ServeHTTP(w, r)
 				}
