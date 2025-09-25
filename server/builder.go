@@ -3,6 +3,8 @@ package server
 import (
 	"fmt"
 	"goserve/configuration"
+	"goserve/middlewares"
+	"goserve/routes"
 	"log"
 	"net/http"
 	"time"
@@ -14,8 +16,8 @@ type builder struct {
 	mux          *http.ServeMux
 	port         int
 	address      string
-	routes       []RouteInfo
-	middlewares  []MiddlewareInfo
+	routes       []routes.RouteInfo
+	middlewares  []middlewares.MiddlewareInfo
 	config       configuration.Configuration
 	readTimeout  int
 	writeTimeout int
@@ -27,10 +29,10 @@ type builder struct {
 func New() ServerBuilder {
 	return &builder{
 		mux:          http.NewServeMux(),
-		routes:       make([]RouteInfo, 0),
+		routes:       make([]routes.RouteInfo, 0),
 		address:      "",
 		port:         8080, // Default port
-		middlewares:  make([]MiddlewareInfo, 0),
+		middlewares:  make([]middlewares.MiddlewareInfo, 0),
 		config:       nil,
 		readTimeout:  15,
 		writeTimeout: 15,
@@ -48,40 +50,40 @@ func (s *builder) SetPort(port int) ServerBuilder {
 	return s
 }
 
-func (s *builder) AddRoute(method Http_Method, path string, handler HandlerFunc) ServerBuilder {
-	s.routes = append(s.routes, CreateRoute(method, path, handler))
+func (s *builder) AddRoute(method routes.Http_Method, path string, handler routes.ActionFunc) ServerBuilder {
+	s.routes = append(s.routes, routes.CreateRoute(method, path, handler))
 
 	return s
 }
 
-func (s *builder) AddRoutes(routes []RouteInfo) ServerBuilder {
+func (s *builder) AddRoutes(routes []routes.RouteInfo) ServerBuilder {
 	s.routes = append(s.routes, routes...)
 	return s
 }
 
-func (s *builder) GET(path string, handler HandlerFunc) ServerBuilder {
-	return s.addRoute(CreateGET(path, handler))
+func (s *builder) GET(path string, handler routes.ActionFunc) ServerBuilder {
+	return s.addRoute(routes.CreateGET(path, handler))
 }
 
-func (s *builder) POST(path string, handler HandlerFunc) ServerBuilder {
-	return s.addRoute(CreatePOST(path, handler))
+func (s *builder) POST(path string, handler routes.ActionFunc) ServerBuilder {
+	return s.addRoute(routes.CreatePOST(path, handler))
 }
 
-func (s *builder) PUT(path string, handler HandlerFunc) ServerBuilder {
-	return s.addRoute(CreatePUT(path, handler))
+func (s *builder) PUT(path string, handler routes.ActionFunc) ServerBuilder {
+	return s.addRoute(routes.CreatePUT(path, handler))
 }
 
-func (s *builder) DELETE(path string, handler HandlerFunc) ServerBuilder {
-	return s.addRoute(CreateDELETE(path, handler))
+func (s *builder) DELETE(path string, handler routes.ActionFunc) ServerBuilder {
+	return s.addRoute(routes.CreateDELETE(path, handler))
 }
 
-func (s *builder) addRoute(route RouteInfo) ServerBuilder {
+func (s *builder) addRoute(route routes.RouteInfo) ServerBuilder {
 	s.routes = append(s.routes, route)
 	return s
 }
 
-func (s *builder) AddGlobalMiddleware(name string, middleware MiddlewareFunc) ServerBuilder {
-	s.middlewares = append(s.middlewares, MiddlewareInfo{
+func (s *builder) AddGlobalMiddleware(name string, middleware middlewares.MiddlewareFunc) ServerBuilder {
+	s.middlewares = append(s.middlewares, middlewares.MiddlewareInfo{
 		Name:       name,
 		Middleware: middleware,
 	})
@@ -112,36 +114,6 @@ func (s *builder) WithLogging(logRequests, logResponses bool) ServerBuilder {
 		})
 	}
 	return s
-}
-
-func (s *builder) registerRoute(route RouteInfo) {
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != string(route.GetMethod()) {
-			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		route.GetHandler().handler(w, r)
-	})
-
-	finalHandler := s.applyMiddlewares(handler, route)
-
-	s.mux.Handle(route.GetPath(), finalHandler)
-}
-
-func (s *builder) applyMiddlewares(handler http.Handler, route RouteInfo) http.Handler {
-	result := handler
-
-	for i := len(s.middlewares) - 1; i >= 0; i-- {
-		middleware := s.middlewares[i]
-		result = middleware.Middleware(result)
-	}
-
-	for i := len(route.GetHandler().middlewares) - 1; i >= 0; i-- {
-		middleware := route.GetHandler().middlewares[i]
-		result = middleware(result)
-	}
-
-	return result
 }
 
 func (s *builder) Build() HttpServer {
@@ -203,4 +175,58 @@ func (s *builder) logServerConfig() {
 	for _, route := range s.routes {
 		log.Printf("  %s %s", route.GetMethod(), route.GetPath())
 	}
+}
+
+func (s *builder) registerRoute(route routes.RouteInfo) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != string(route.GetMethod()) {
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		action := route.GetHandler()
+		if action == nil {
+			http.Error(w, "Not Implemented", http.StatusNotImplemented)
+			return
+		}
+		result, err := (*action)(r)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(err.Error()))
+			return
+		}
+
+		w.Header().Set("Content-Type", result.ContentType())
+		w.WriteHeader(result.Code())
+		if !result.IsDataEmpty() {
+			json, err := result.JsonString()
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte("Failed to serialize response"))
+				return
+			}
+
+			w.Write(json)
+		}
+	})
+
+	finalHandler := s.applyMiddlewares(handler, route)
+
+	s.mux.Handle(route.GetPath(), finalHandler)
+}
+
+func (s *builder) applyMiddlewares(handler http.Handler, route routes.RouteInfo) http.Handler {
+	result := handler
+
+	for i := len(s.middlewares) - 1; i >= 0; i-- {
+		middleware := s.middlewares[i]
+		result = middleware.Middleware(result)
+	}
+
+	middlewares := route.GetMiddlewares()
+	for i := len(middlewares) - 1; i >= 0; i-- {
+		middleware := middlewares[i]
+		result = middleware(result)
+	}
+
+	return result
 }

@@ -43,7 +43,7 @@ func (rc *ResponseContext) Context() context.Context {
 
 type JSONHandlerFunc func(w http.ResponseWriter, r *http.Request) (interface{}, error)
 
-func ConvertJSONHandler(handler JSONHandlerFunc) HandlerFunc {
+func ConvertJSONHandler(handler JSONHandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		data, err := handler(w, r)
 

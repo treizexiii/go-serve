@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"goserve/configuration"
+	"goserve/responses"
+	"goserve/routes"
 	"goserve/server"
 	"log"
 	"net/http"
@@ -17,27 +19,27 @@ func main() {
 		log.Fatalf("Error loading configuration: %v", err)
 	}
 
-	hello := server.
-		CreateRoute(server.GET, "/hello", func(w http.ResponseWriter, r *http.Request)x {
-			w.Write([]byte("Hello, World!"))
+	hello := routes.
+		CreateRoute(routes.GET, "/hello", func(r *http.Request) (responses.ApiResponse, error) {
+			return responses.Ok(map[string]string{
+				"message": "Hello, World!",
+			}), nil
 		})
 
-	demo := server.CreateRoute(server.GET, "/demo", contextDemoHandler())
+	demo := routes.CreateRoute(routes.GET, "/demo", contextDemoHandler)
 
 	builder := server.New().
 		WithConfiguration(configuration).
-		WithJSONSerialization().
+		// WithJSONSerialization().
 		WithLogging(true, true).
-		AddRoutes([]server.RouteInfo{
+		AddRoutes([]routes.RouteInfo{
 			hello,
+			demo,
 		}).
-		POST("/echo", func(w http.ResponseWriter, r *http.Request) {
+		POST("/echo", func(r *http.Request) (responses.ApiResponse, error) {
 			body := make([]byte, r.ContentLength)
 			r.Body.Read(body)
-
-			result := fmt.Sprintf("Echo: %s", string(body))
-
-			w.Write([]byte(result))
+			return responses.Ok(body), nil
 		})
 
 	server := builder.Build()
@@ -48,7 +50,7 @@ func main() {
 	}
 }
 
-func contextDemoHandler(w http.ResponseWriter, r *http.Request) any {
+func contextDemoHandler(r *http.Request) (responses.ApiResponse, error) {
 	// Créer des données via le contexte (approche alternative)
 	responseData := map[string]interface{}{
 		"message":     "Données passées via le contexte",
@@ -59,5 +61,5 @@ func contextDemoHandler(w http.ResponseWriter, r *http.Request) any {
 	}
 
 	// Utiliser le helper pour structurer la réponse
-	return responseData
+	return responses.Ok(responseData), nil
 }

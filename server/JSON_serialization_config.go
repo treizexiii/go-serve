@@ -1,8 +1,8 @@
 package server
 
 import (
+	"goserve/responses"
 	"net/http"
-	"time"
 )
 
 type JSONSerializationConfig struct {
@@ -32,18 +32,10 @@ var DefaultJSONConfig = JSONSerializationConfig{
 	ContentType:      "application/json; charset=utf-8",
 
 	ErrorWrapper: func(err error, r *http.Request) interface{} {
-		return ErrorResponse{
-			Success:   false,
-			Message:   err.Error(),
-			Timestamp: time.Now().Unix(),
-		}
+		return responses.InternalError(err.Error())
 	},
 
 	SuccessWrapper: func(data interface{}, r *http.Request) interface{} {
-		return SuccessResponse{
-			Success:   true,
-			Data:      data,
-			Timestamp: time.Now().Unix(),
-		}
+		return responses.Ok(data)
 	},
 }

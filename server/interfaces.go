@@ -2,18 +2,10 @@ package server
 
 import (
 	"goserve/configuration"
+	"goserve/middlewares"
+	"goserve/routes"
 	"net/http"
 )
-
-type RouteInfo interface {
-	WithTags(tags ...string) RouteInfo
-	WithMeta(key string, value interface{}) RouteInfo
-	WithMiddleware(middlewares ...MiddlewareFunc) RouteInfo
-
-	GetPath() string
-	GetMethod() Http_Method
-	GetHandler() *RouteHandler
-}
 
 type ServerBuilder interface {
 	// Add a configuration to the server
@@ -22,22 +14,22 @@ type ServerBuilder interface {
 	// Set the port for the server (default: 8080)
 	SetPort(port int) ServerBuilder
 
-	AddGlobalMiddleware(name string, middleware MiddlewareFunc) ServerBuilder
+	AddGlobalMiddleware(name string, middleware middlewares.MiddlewareFunc) ServerBuilder
 	WithJSONSerialization() ServerBuilder
 	WithLogging(logRequests, logResponses bool) ServerBuilder
 
 	// Add a single route to the server
-	AddRoute(method Http_Method, path string, handler HandlerFunc) ServerBuilder
+	AddRoute(method routes.Http_Method, path string, handler routes.ActionFunc) ServerBuilder
 	// Add multiple routes to the server
-	AddRoutes(routes []RouteInfo) ServerBuilder
+	AddRoutes(routes []routes.RouteInfo) ServerBuilder
 	// Create and add a GET route to the server
-	GET(path string, handler HandlerFunc) ServerBuilder
+	GET(path string, handler routes.ActionFunc) ServerBuilder
 	// Create and add a POST route to the server
-	POST(path string, handler HandlerFunc) ServerBuilder
+	POST(path string, handler routes.ActionFunc) ServerBuilder
 	// Create and add a PUT route to the server
-	PUT(path string, handler HandlerFunc) ServerBuilder
+	PUT(path string, handler routes.ActionFunc) ServerBuilder
 	// Create and add a DELETE route to the server
-	DELETE(path string, handler HandlerFunc) ServerBuilder
+	DELETE(path string, handler routes.ActionFunc) ServerBuilder
 
 	// Build and return the configured http server
 	Build() HttpServer

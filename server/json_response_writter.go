@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"goserve/middlewares"
+	"goserve/responses"
 	"net/http"
 	"strings"
-	"time"
 )
 
 const (
@@ -41,11 +42,11 @@ func (jw *jsonResponseWriter) handleContextResponse() {
 }
 
 func (jw *jsonResponseWriter) buildContextResponse(ctx context.Context, data interface{}) interface{} {
-	response := SuccessResponse{
-		Success:   true,
-		Timestamp: time.Now().Unix(),
-		Data:      data,
-	}
+	// response := SuccessResponse{
+	// 	Success:   true,
+	// 	Timestamp: time.Now().Unix(),
+	// 	Data:      data,
+	// }
 
 	// // Ajouter le message s'il existe
 	// if msg, ok := ctx.Value(ResponseMessageKey).(string); ok {
@@ -57,7 +58,7 @@ func (jw *jsonResponseWriter) buildContextResponse(ctx context.Context, data int
 	// 	response.Meta = meta
 	// }
 
-	return response
+	return data
 }
 
 func (jw *jsonResponseWriter) writeError(err error) {
@@ -81,12 +82,7 @@ func (jw *jsonResponseWriter) writeJSON(data interface{}) (int, error) {
 	}
 
 	if err != nil {
-		errorResponse := ErrorResponse{
-			Success:   false,
-			Message:   err.Error(),
-			Timestamp: time.Now().Unix(),
-		}
-
+		errorResponse := responses.InternalError("Failed to serialize response")
 		jsonData, _ = json.Marshal(errorResponse)
 		jw.writeHeader(http.StatusInternalServerError)
 	}
@@ -135,7 +131,7 @@ func (jw *jsonResponseWriter) wrapResponse(data interface{}, code int) interface
 	}
 
 	if jw.config.WrapSingleValues && jw.config.SuccessWrapper != nil {
-		if _, ok := data.(ApiResponse); !ok {
+		if _, ok := data.(responses.ApiResponse); !ok {
 			return jw.config.SuccessWrapper(data, jw.request)
 		}
 	}
@@ -157,7 +153,7 @@ func (jw *jsonResponseWriter) isJSONContent() bool {
 	return strings.Contains(contentType, "application/json")
 }
 
-func JSONSerializationMiddleware() MiddlewareFunc {
+func JSONSerializationMiddleware() middlewares.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			jsonWriter := &jsonResponseWriter{
